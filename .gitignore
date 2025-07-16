@@ -1,0 +1,10 @@
+__pycache__/
+/document
+.vscode
+.env
+*.pyc
+*.pot
+*.log
+venv/
+myenv/
+env/
