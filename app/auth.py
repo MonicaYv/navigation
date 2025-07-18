@@ -60,7 +60,7 @@ async def register(
 
 
     @router.post("/api/login/request-otp")
-async def login_request_otp(data: UserLogin, db: AsyncSession = Depends(get_db)):
+async def login_request_otp(data: UserLogin, db: AsyncSession = Depends(get_db),_auth=Depends(check_authorization_key)):
     q = await db.execute(select(User).where(User.email == data.email))
     user = q.scalar_one_or_none()
     if not user.otp_secret:
@@ -70,7 +70,7 @@ async def login_request_otp(data: UserLogin, db: AsyncSession = Depends(get_db))
     return {"status":True,"msg": "OTP sent to email"}
 
 @router.post("/api/login/verify")
-async def login_verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
+async def login_verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db),_auth=Depends(check_authorization_key)):
     q = await db.execute(select(User).where(User.email == data.email))
     user = q.scalar_one_or_none()
     if not user or not user.otp_secret:
