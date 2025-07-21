@@ -1,10 +1,13 @@
-from fastapi import Depends, HTTPException
+from fastapi import APIRouter,Depends, HTTPException
 from jose import jwt, JWTError
 from app.models import User
 from app.config import SECRET_KEY, ALGORITHM
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi.security import OAuth2PasswordBearer
+from app.database import SessionLocal
+from app.auth import check_authorization_key
+router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
