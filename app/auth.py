@@ -49,9 +49,9 @@ async def register(
     q = await db.execute(select(User).where(User.email == data.email))
     user_in_db = q.scalar_one_or_none()
     if user_in_db:
-        return {'status': False, "msg": "Email already registered"}
+        raise HTTPException(status_code=401, detail="Email already registered")
     if not verify_otp(data.otp_token, data.otp):
-        return {'status': False, "msg": "Invalid OTP"}
+        raise HTTPException(status_code=401, detail="Invalid OTP")
     new_user = User(
         name=data.name,
         email=data.email,
@@ -61,7 +61,7 @@ async def register(
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
-    return {'status': True, "msg": "User registered successfully", "user": new_user}
+    return new_user
 
 @router.post("/api/login/request-otp")
 async def login_request_otp(
