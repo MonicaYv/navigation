@@ -10,6 +10,6 @@ ALGORITHM = os.getenv("ALGORITHM")
 SMTP_USERNAME = os.getenv("EMAIL_HOST_USER")
 SMTP_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 SMTP_FROM = os.getenv("DEFAULT_FROM_EMAIL")
-SMTP_SERVER = os.getenv("EMAIL_HOST")
+SMTP_HOST = os.getenv("EMAIL_HOST")
 SMTP_PORT = int(os.getenv("EMAIL_PORT", 587))
 SMTP_TLS = os.getenv("MAIL_TLS") == "True"
