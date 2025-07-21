@@ -11,6 +11,10 @@ router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+async def get_db():
+    async with SessionLocal() as session:
+        yield session
+        
 async def verify_auth(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
