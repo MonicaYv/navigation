@@ -24,20 +24,23 @@ async def get_db():
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def check_authorization_key(authorization: str = Header(...)):
-    if authorization != AUTHORIZATION_KEY:
+def check_authorization_key(authorization_key: str = Header(...)):
+    if authorization_key != AUTHORIZATION_KEY:
         raise HTTPException(status_code=401, detail="Invalid authorization key")
-    return authorization
+    return authorization_key
 
 @router.post("/api/send-otp")
 async def send_otp(user: UserCreate, _auth=Depends(check_authorization_key)):
     otp_secret = generate_otp_secret()
     otp = generate_otp(otp_secret)
-    asyncio.create_task(send_email(user.email, "Your OTP Code", f"Your OTP is: {otp}"))
+    await send_email(user.email, "Your OTP Code", f"Your OTP is: {otp}")
+    print(f"Generated otp_token: {otp_secret}")
+    print(f"Sent OTP: {otp}")
+
     return {"otp_token": otp_secret}
 
 @router.post("/api/register", response_model=UserOut)
@@ -46,12 +49,15 @@ async def register(
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
+    print(f"Received otp_token: {data.otp_token}")
+    print(f"Received OTP: {data.otp}")
+    print(f"OTP verify result: {verify_otp(data.otp_token, data.otp)}")
     q = await db.execute(select(User).where(User.email == data.email))
     user_in_db = q.scalar_one_or_none()
     if user_in_db:
-        return {'status': False, "msg": "Email already registered"}
+        raise HTTPException(status_code=401, detail="Email already registered")
     if not verify_otp(data.otp_token, data.otp):
-        return {'status': False, "msg": "Invalid OTP"}
+        raise HTTPException(status_code=401, detail="Invalid OTP")
     new_user = User(
         name=data.name,
         email=data.email,
@@ -61,7 +67,7 @@ async def register(
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
-    return {'status': True, "msg": "User registered successfully", "user": new_user}
+    return new_user
 
 @router.post("/api/login/request-otp")
 async def login_request_otp(
