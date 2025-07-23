@@ -34,11 +34,17 @@ async def verify_auth(
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
-@router.get("/api/verify-auth")
-async def verify_auth_api(user: User = Depends(verify_auth)):
+@router.get("/api/user")
+async def user_details(user: User = Depends(verify_auth)):
     return {"status": True, "msg": "Authenticated", "user": {
         "id": user.id,
         "name": user.name,
         "email": user.email,
         "is_active": user.is_active
     }}
+
+@router.get("/api/get-route")
+async def get_routes(user: User = Depends(verify_auth)):
+    
+    
+    return {"status": True, "msg": "Authenticated"}

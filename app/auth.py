@@ -24,14 +24,14 @@ async def get_db():
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def check_authorization_key(authorization: str = Header(...)):
-    if authorization != AUTHORIZATION_KEY:
+def check_authorization_key(authorization_key: str = Header(...)):
+    if authorization_key != AUTHORIZATION_KEY:
         raise HTTPException(status_code=401, detail="Invalid authorization key")
-    return authorization
+    return authorization_key
 
 @router.post("/api/send-otp")
 async def send_otp(user: UserCreate, _auth=Depends(check_authorization_key)):
