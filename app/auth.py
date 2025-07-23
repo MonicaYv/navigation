@@ -37,7 +37,10 @@ def check_authorization_key(authorization: str = Header(...)):
 async def send_otp(user: UserCreate, _auth=Depends(check_authorization_key)):
     otp_secret = generate_otp_secret()
     otp = generate_otp(otp_secret)
-    asyncio.create_task(send_email(user.email, "Your OTP Code", f"Your OTP is: {otp}"))
+    await send_email(user.email, "Your OTP Code", f"Your OTP is: {otp}")
+    print(f"Generated otp_token: {otp_secret}")
+    print(f"Sent OTP: {otp}")
+
     return {"otp_token": otp_secret}
 
 @router.post("/api/register", response_model=UserOut)
@@ -46,6 +49,9 @@ async def register(
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
+    print(f"Received otp_token: {data.otp_token}")
+    print(f"Received OTP: {data.otp}")
+    print(f"OTP verify result: {verify_otp(data.otp_token, data.otp)}")
     q = await db.execute(select(User).where(User.email == data.email))
     user_in_db = q.scalar_one_or_none()
     if user_in_db:
