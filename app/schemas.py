@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class UserCreate(BaseModel):
@@ -125,3 +125,22 @@ class AllowedDomainOut(AllowedDomainCreate):
     created_at: datetime
     class Config:
         orm_mode = True
+
+# Maps 
+
+class LocationPoint(BaseModel):
+    lat: float
+    lon: float
+    
+class RouteRequest(BaseModel):
+    locations: List[LocationPoint]
+    costing: str = "auto"  # Default to "auto"
+    # Add other optional parameters as needed
+    units: Optional[str] = "kilometers"
+    language: Optional[str] = "en-US"
+    
+class RouteResponse(BaseModel):
+    status: bool
+    msg: str
+    data: Optional[dict] = None
+    error: Optional[str] = None

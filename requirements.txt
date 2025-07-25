@@ -11,3 +11,5 @@ aiosmtplib
 python-dotenv
 email-validator
 motor
+httpx
+logging
