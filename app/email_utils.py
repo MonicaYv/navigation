@@ -1,12 +1,6 @@
 import aiosmtplib
 from email.message import EmailMessage
-
-
-SMTP_HOST = "mail.sizaf.com"
-SMTP_PORT = 465
-SMTP_USERNAME = "dotsdesktop@sizaf.com"
-SMTP_PASSWORD = "eri$45;e]H0K"
-SMTP_FROM = "dotsdesktop@sizaf.com"
+from .config import SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM, SMTP_TLS
 
 async def send_email(recipient: str, subject: str, body: str):
     msg = EmailMessage()
@@ -14,7 +8,7 @@ async def send_email(recipient: str, subject: str, body: str):
     msg["To"] = recipient
     msg["Subject"] = subject
     msg.set_content(body)
-    print("Connecting to mail.sizaf.com:465 with SSL")
+    print(f"Connecting to {SMTP_HOST}:{SMTP_PORT} with SSL")
     try:
         await aiosmtplib.send(
             msg,
@@ -22,7 +16,7 @@ async def send_email(recipient: str, subject: str, body: str):
             port=SMTP_PORT,
             username=SMTP_USERNAME,
             password=SMTP_PASSWORD,
-            use_tls=True,     # <--- For port 465 (SSL)
+            use_tls=SMTP_TLS,
         )
         print("Email sent!")
     except Exception as e:
