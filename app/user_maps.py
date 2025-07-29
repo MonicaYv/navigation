@@ -77,7 +77,7 @@ async def get_routes(route_request: RouteRequest, user: User = Depends(verify_au
         # Using httpx for async HTTP requests
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                "http://localhost:3095/route",
+                "http://192.168.1.110:3095/route",
                 json=external_payload,
                 headers={"Content-Type": "application/json"}
             )
@@ -118,10 +118,15 @@ async def get_routes(route_request: RouteRequest, user: User = Depends(verify_au
         )
 
 @router.get("/api/map-tiles/{z}/{x}/{y}.png")
-async def get_map_tile(z: int, x: int, y: int, user: User = Depends(verify_auth)):
-    tile_url = f"https://b.tile.openstreetmap.org/{z}/{x}/{y}.png"
+async def get_map_tile(z: int, x: int, y: int, style: str = "day", user: User = Depends(verify_auth)):
+    if style == "day":
+        tile_url = f"http://192.168.1.110:4090/styles/test-style/512/{z}/{x}/{y}.png"
+    elif style == "night":
+        tile_url = f"http://192.168.1.110:4090/styles/maptiler-basic/512/{z}/{x}/{y}.png"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid style parameter. Use 'day' or 'night'.")
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=12.0) as client:
             response = await client.get(tile_url)
             response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
             return StreamingResponse(response.iter_bytes(), media_type=response.headers['Content-Type'])
