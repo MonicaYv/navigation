@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
+from enum import Enum
 
 class UserCreate(BaseModel):
     name: str
@@ -144,3 +145,29 @@ class RouteResponse(BaseModel):
     msg: str
     data: Optional[dict] = None
     error: Optional[str] = None
+    
+class NavigationStatus(str, Enum):
+    completed = "completed"
+    half_completed = "half_completed"
+    disconnected = "disconnected"
+    cancelled = "cancelled"
+
+class TurnLogCreate(BaseModel):
+    instruction: str
+    latitude: float
+    longitude: float
+    timestamp: datetime
+
+class NavigationLogHistoryCreate(BaseModel):
+    navigation_log_id: int | None = None
+    start_place: str
+    destination: str
+    start_lat: float
+    start_lng: float
+    end_lat: float
+    end_lng: float
+    start_time: datetime
+    end_time: datetime
+    status: NavigationStatus
+    message: str
+    turn_logs: List[TurnLogCreate] = []
