@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Numeric, Text, TIMESTAMP
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Numeric, Text, TIMESTAMP, Interval, Enum, Float
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
+import enum
 
 class User(Base):
     __tablename__ = "users"
@@ -99,5 +101,55 @@ class AllowedDomain(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
+class NavigationLog(Base):
+    __tablename__ = "navigation_logs"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    start_place = Column(String(255))
+    destination = Column(String(255))
+    start_time = Column(TIMESTAMP)
+    end_time = Column(TIMESTAMP)
+    time_taken = Column(Interval)
+    directions = Column(JSONB)  # PostgreSQL JSONB to store maneuvers
+    status = Column(Boolean, default=False)
+    message = Column(String(255))
+    error = Column(String(255), nullable=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
 
+class NavigationStatus(str, enum.Enum):
+    completed = "completed"
+    half_completed = "half_completed"
+    disconnected = "disconnected"
+    cancelled = "cancelled"
+
+class NavigationLogHistory(Base):
+    __tablename__ = "navigation_log_history"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    navigation_log_id = Column(Integer, ForeignKey("navigation_logs.id", ondelete="SET NULL"))
+    start_place = Column(String(255))
+    destination = Column(String(255))
+    start_lat = Column(Float)
+    start_lng = Column(Float)
+    end_lat = Column(Float)
+    end_lng = Column(Float)
+    start_time = Column(TIMESTAMP)
+    end_time = Column(TIMESTAMP)
+    trip_duration = Column(Interval)
+    date = Column(TIMESTAMP, server_default=func.now())
+    status = Column(Enum(NavigationStatus))
+    message = Column(String(255))
+
+    turn_logs = relationship("TurnLog", back_populates="navigation_log", cascade="all, delete")
+
+class TurnLog(Base):
+    __tablename__ = "turn_logs"
+    id = Column(Integer, primary_key=True)
+    navigation_id = Column(Integer, ForeignKey("navigation_log_history.id", ondelete="CASCADE"))
+    instruction = Column(String(255))
+    latitude = Column(Float)
+    longitude = Column(Float)
+    timestamp = Column(TIMESTAMP)
+
+    navigation_log = relationship("NavigationLogHistory", back_populates="turn_logs")
 

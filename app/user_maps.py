@@ -1,7 +1,7 @@
-from fastapi import APIRouter,Depends, HTTPException
+from fastapi import APIRouter,Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from jose import jwt, JWTError
-from app.models import User
+from app.models import User, NavigationLog
 from app.schemas import RouteRequest, RouteResponse
 from app.config import SECRET_KEY, ALGORITHM
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,8 +9,12 @@ from sqlalchemy.future import select
 from fastapi.security import OAuth2PasswordBearer
 from app.database import SessionLocal
 from app.auth import check_authorization_key
+from app.navigation_log import save_navigation_log
+from app import models, schemas
+from datetime import datetime 
 import logging
 import httpx
+import asyncio
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -50,8 +54,20 @@ async def user_details(user: User = Depends(verify_auth)):
     }}
 
 @router.post("/api/get-route", response_model=RouteResponse)
-async def get_routes(route_request: RouteRequest, user: User = Depends(verify_auth)):
+async def get_routes(route_request: RouteRequest, user: User = Depends(verify_auth), db: AsyncSession = Depends(get_db)):
     if len(route_request.locations) < 2:
+        await save_navigation_log(
+            db=db,
+            user_id=user.id,
+            start_place="",
+            destination="",
+            start_time=datetime.utcnow(),
+            end_time=datetime.utcnow(),
+            directions=[],
+            status=False,
+            message="At least 2 locations required",
+            error="Insufficient locations"
+        )
         return RouteResponse(
             status=False,
             msg="At least 2 locations required for routing",
@@ -72,6 +88,9 @@ async def get_routes(route_request: RouteRequest, user: User = Depends(verify_au
             "target_count": 3
         }
     }
+    start_loc = route_request.locations[0]
+    end_loc = route_request.locations[-1]
+    start_time = datetime.utcnow()
     try:
         # Make HTTP request to external routing service
         # Using httpx for async HTTP requests
@@ -81,15 +100,40 @@ async def get_routes(route_request: RouteRequest, user: User = Depends(verify_au
                 json=external_payload,
                 headers={"Content-Type": "application/json"}
             )
+            end_time = datetime.utcnow()
             # Check if the response is successful
             if response.status_code == 200:
                 route_data = response.json()
+                maneuvers = route_data.get("trip", {}).get("legs", [])[0].get("maneuvers", [])
+                await save_navigation_log(
+                db=db,
+                user_id=user.id,
+                start_place=f"{start_loc.lat},{start_loc.lon}",
+                destination=f"{end_loc.lat},{end_loc.lon}",
+                start_time=start_time,
+                end_time=end_time,
+                directions=maneuvers,
+                status=True,
+                message="Route calculated successfully"
+                )
                 return RouteResponse(
                     status=True,
                     msg="Route calculated successfully",
                     data=route_data
                 )
             else:
+                await save_navigation_log(
+                db=db,
+                user_id=user.id,
+                start_place=f"{start_loc.lat},{start_loc.lon}",
+                destination=f"{end_loc.lat},{end_loc.lon}",
+                start_time=start_time,
+                end_time=datetime.utcnow(),
+                directions=[],
+                status=False,
+                message="Failed to calculate route",
+                error=f"Status code {response.status_code}"
+                )
                 return RouteResponse(
                     status=False,
                     msg="Failed to calculate route",
@@ -111,6 +155,18 @@ async def get_routes(route_request: RouteRequest, user: User = Depends(verify_au
         )
         
     except Exception as e:
+        await save_navigation_log(
+            db=db,
+            user_id=user.id,
+            start_place=f"{start_loc.lat},{start_loc.lon}",
+            destination=f"{end_loc.lat},{end_loc.lon}",
+            start_time=start_time,
+            end_time=datetime.utcnow(),
+            directions=[],
+            status=False,
+            message="Internal server error",
+            error=str(e)
+        )
         return RouteResponse(
             status=False,
             msg="Internal server error",

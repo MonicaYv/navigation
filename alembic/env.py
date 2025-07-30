@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app.database import SYNC_DATABASE_URL, Base
 
 # Import all models for 'autogenerate' support
-from app.models import User, Company, Plan, CompanySubscription, APIUsage, Invoice, AllowedDomain
+from app.models import User, Company, Plan, CompanySubscription, APIUsage, Invoice, AllowedDomain, NavigationLog, NavigationLogHistory, TurnLog
 
 # Alembic config object
 config = context.config
