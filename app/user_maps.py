@@ -120,9 +120,9 @@ async def get_routes(route_request: RouteRequest, user: User = Depends(verify_au
 @router.get("/api/map-tiles/{z}/{x}/{y}.png")
 async def get_map_tile(z: int, x: int, y: int, style: str = "day", user: User = Depends(verify_auth)):
     if style == "day":
-        tile_url = f"http://192.168.1.110:4090/styles/test-style/512/{z}/{x}/{y}.png"
+        tile_url = f"http://192.168.1.110:4090/styles/test-style/256/{z}/{x}/{y}.png"
     elif style == "night":
-        tile_url = f"http://192.168.1.110:4090/styles/maptiler-basic/512/{z}/{x}/{y}.png"
+        tile_url = f"http://192.168.1.110:4090/styles/maptiler-basic/256/{z}/{x}/{y}.png"
     else:
         raise HTTPException(status_code=400, detail="Invalid style parameter. Use 'day' or 'night'.")
     try:
