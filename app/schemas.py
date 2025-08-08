@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 from enum import Enum
 
@@ -13,7 +13,7 @@ class UserOut(BaseModel):
     email: EmailStr
     is_active: bool
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -40,7 +40,7 @@ class CompanyOut(CompanyCreate):
     is_active: bool
     created_at: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Plan
 class PlanCreate(BaseModel):
@@ -57,7 +57,7 @@ class PlanOut(PlanCreate):
     is_active: bool
     created_at: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Subscription
 class CompanySubscriptionCreate(BaseModel):
@@ -80,7 +80,7 @@ class CompanySubscriptionOut(BaseModel):
     auto_renew: Optional[bool]
     created_at: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # API Usage
 class APIUsageCreate(BaseModel):
@@ -94,7 +94,7 @@ class APIUsageOut(APIUsageCreate):
     id: int
     timestamp: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Invoice
 class InvoiceCreate(BaseModel):
@@ -112,7 +112,7 @@ class InvoiceOut(InvoiceCreate):
     id: int
     issue_date: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Allowed Domain
 class AllowedDomainCreate(BaseModel):
@@ -125,7 +125,7 @@ class AllowedDomainOut(AllowedDomainCreate):
     is_active: bool
     created_at: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Maps 
 
@@ -171,3 +171,18 @@ class NavigationLogHistoryCreate(BaseModel):
     status: NavigationStatus
     message: str
     turn_logs: List[TurnLogCreate] = []
+    
+# Geofence
+
+class GeofenceCreate(BaseModel):
+    name: str
+    coordinates: List[List[float]]
+
+class GeofenceOut(BaseModel):
+    id: int
+    name: str
+    geom: str
+    created_at: datetime  
+
+    class Config:
+        from_attributes = True

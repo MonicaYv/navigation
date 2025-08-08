@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app.database import SYNC_DATABASE_URL, Base
 
 # Import all models for 'autogenerate' support
-from app.models import User, Company, Plan, CompanySubscription, APIUsage, Invoice, AllowedDomain, NavigationLog, NavigationLogHistory, TurnLog
+from app.models import User, Company, Plan, CompanySubscription, APIUsage, Invoice, AllowedDomain, NavigationLog, NavigationLogHistory, TurnLog, Geofence
 
 # Alembic config object
 config = context.config
@@ -35,7 +35,7 @@ def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        connection=connection,
+        url=url,
         target_metadata=target_metadata,
         include_object=include_object,
         # ...other args

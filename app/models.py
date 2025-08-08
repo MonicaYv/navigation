@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Numeric, Text, TIMESTAMP, Interval, Enum, Float
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Numeric, Text, TIMESTAMP, Interval, Enum, Float, DateTime, JSON
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from geoalchemy2 import Geometry
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
@@ -153,3 +154,10 @@ class TurnLog(Base):
 
     navigation_log = relationship("NavigationLogHistory", back_populates="turn_logs")
 
+class Geofence(Base):
+    __tablename__ = "geofences"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    geom = Column(Geometry(geometry_type='POLYGON', srid=4326), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
