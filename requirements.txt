@@ -14,3 +14,4 @@ email-validator
 motor
 httpx
 logging
+shapely

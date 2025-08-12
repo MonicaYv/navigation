@@ -4,7 +4,7 @@ const apiBase = "/api/geofences";
 const authKey = "GWG$%$fg365vhgfh6$*&^25dhERYET";
 
 const map = L.map("map").setView([19.076, 72.8777], 11);
-L.tileLayer("http://192.168.1.110:4090/styles/maptiler-basic/256/{z}/{x}/{y}.png").addTo(map);
+L.tileLayer("http://192.168.1.110:4090/styles/light-mode/256/{z}/{x}/{y}.png").addTo(map);
 
 const drawnItems = new L.FeatureGroup().addTo(map);
 const drawControl = new L.Control.Draw({
