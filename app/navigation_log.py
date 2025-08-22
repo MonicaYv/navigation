@@ -9,10 +9,10 @@ async def save_navigation_log(
     destination: str,
     start_time: datetime,
     end_time: datetime,
-    directions: list,
     status: bool,
     message: str,
-    error: str = None
+    error: str = None,
+    directions: list = [],
 ):
     duration = end_time - start_time
     log = NavigationLog(

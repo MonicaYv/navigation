@@ -6,6 +6,7 @@ from .auth import router as auth_router
 from .user_maps import router as user_maps_router
 from .search_maps import router as search_maps_router
 from .geofencing import router as geofencing_router
+from .direction import router as direction_router
 
 app = FastAPI()
 
@@ -16,6 +17,7 @@ app.include_router(auth_router)
 app.include_router(user_maps_router)
 app.include_router(search_maps_router)
 app.include_router(geofencing_router)
+app.include_router(direction_router)
 
 @app.get("/")
 def root():

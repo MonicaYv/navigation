@@ -1,5 +1,4 @@
-const token =
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzcGFyc2hzYWh1NTY3QGdtYWlsLmNvbSIsImV4cCI6MTc1NDQxMzE5MH0.R2AXT-DrYP39Mt_Iza4Q15mKGvEzYySqXFGWwH5G3YY";
+const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzcGFyc2hzYWh1NTY3QGdtYWlsLmNvbSIsImV4cCI6MTc1NDQxMzE5MH0.R2AXT-DrYP39Mt_Iza4Q15mKGvEzYySqXFGWwH5G3YY";
 const apiBase = "/api/geofences";
 const authKey = "GWG$%$fg365vhgfh6$*&^25dhERYET";
 

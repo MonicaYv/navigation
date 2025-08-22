@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Dict
 from datetime import datetime
 from enum import Enum
@@ -135,7 +135,7 @@ class LocationPoint(BaseModel):
     
 class RouteRequest(BaseModel):
     locations: List[LocationPoint]
-    costing: str = "auto"  # Default to "auto"
+    mode: str = "auto"  # Default to "auto"
     # Add other optional parameters as needed
     units: Optional[str] = "kilometers"
     language: Optional[str] = "en-US"
@@ -186,3 +186,24 @@ class GeofenceOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SnapRequest(BaseModel):
+    trace: List[LocationPoint] 
+    mode: str = "auto"
+    shape_match: str = "map_snap"
+    
+class MatrixBasicRequest(BaseModel):
+    locations: List[LocationPoint]
+    mode: str = "auto"
+    units: str = "kilometers"
+
+class MatrixRequest(BaseModel):
+    sources: List[LocationPoint]
+    targets: List[LocationPoint]
+    mode: str = "auto"
+    units: str = "kilometers"
+    
+class OptimizedRouteRequest(BaseModel):
+    locations: List[LocationPoint] = Field(..., min_length=4)
+    costing: str = "auto"
+    units: str = "kilometers"
