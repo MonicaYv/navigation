@@ -1,20 +1,32 @@
+import re
+from duckdb import cursor
 import httpx
+from bson import ObjectId
 from jose import jwt, JWTError
-from fastapi import APIRouter,Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from numpy import place
+from pymongo import MongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 from app.models import User
 from app.auth import check_authorization_key
+from app.schemas import NearbyPOIRequest, PlaceDetailsRequest, NearbySearchAdvancedRequest
 from app.config import SECRET_KEY, ALGORITHM
 from app.database import SessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+
 import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+client = AsyncIOMotorClient("mongodb://192.168.1.110:28017")
+db = client["FinalPOIs"]
+pois = db["OSM"]
 
 async def get_db():
     async with SessionLocal() as session:
@@ -89,3 +101,112 @@ async def get_vector_tile(z: int, x: int, y: int, user: User = Depends(verify_au
             detail=f"Could not connect to vector tile server: {e}"
         )
         
+        
+@router.post("/api/nearby-places")
+async def get_nearby_poi(payload: NearbyPOIRequest):
+    """Get nearby points of interest (POI) based on location and distance from user."""
+    try:
+        query = {
+            "geometry": {
+                "$near": {
+                    "$geometry": {
+                        "type": "Point",
+                        "coordinates": [payload.lon, payload.lat]
+                    },
+                    "$maxDistance": payload.distance
+                }
+            }
+        }
+
+        if payload.amenity:
+            query["properties.amenity"] = {
+                "$regex": rf"(^|;){re.escape(payload.amenity)}(;|$)",
+                "$options": "i"
+            }
+
+        cursor = pois.find(query).limit(payload.limit)
+        results = []
+        async for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            results.append(doc)
+
+        return JSONResponse(content={
+            "status": True,
+            "count": len(results),
+            "results": results
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+
+@router.post("/places/details")
+async def place_details(payload: PlaceDetailsRequest):
+    """Retrieve detailed metadata for a place by ID."""
+    try:
+        place = await pois.find_one({"_id": ObjectId(payload.place_id)})
+        if not place:
+            raise HTTPException(status_code=404, detail="Place not found")
+
+        place["_id"] = str(place["_id"])
+        properties = place.get("properties", {})
+        lat = place["geometry"]["coordinates"][1]
+        long = place["geometry"]["coordinates"][0]
+        properties["location"] = {"type": "Point", "coordinates": [long, lat]}
+
+        return JSONResponse(content={"status": True, "result": properties})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/nearby-places-advanced")
+async def get_nearby_poi_advanced(payload: NearbySearchAdvancedRequest):
+    """Advanced nearby POI search with multiple filters and sorting."""
+    try:
+        query = {
+            "geometry": {
+                "$near": {
+                    "$geometry": {
+                        "type": "Point",
+                        "coordinates": [payload.lon, payload.lat]
+                    },
+                    "$maxDistance": payload.distance
+                }
+            }
+        }
+
+        # Amenity filter (supports ';' separated amenities)
+        if payload.amenity:
+            query["properties.amenity"] = {
+                "$regex": rf"(^|;){re.escape(payload.amenity)}(;|$)",
+                "$options": "i"
+            }
+
+        # Keyword in name or description
+        if payload.keyword:
+            query["$or"] = [
+                {"properties.name": {"$regex": payload.keyword, "$options": "i"}},
+                {"properties.description": {"$regex": payload.keyword, "$options": "i"}},
+                {"properties.brand": {"$regex": payload.keyword, "$options": "i"}}
+            ]
+
+        cursor = pois.find(query).limit(payload.limit)
+
+        # Sorting logic
+        if payload.sort_by == "name":
+            cursor = cursor.sort("properties.name", 1)
+        elif payload.sort_by == "brand":
+            cursor = cursor.sort("properties.brand", 1)
+        # Default: distance is auto-sorted by $near
+
+        results = []
+        async for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            results.append(doc)
+
+        return JSONResponse(content={
+            "status": True,
+            "count": len(results),
+            "results": results
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")

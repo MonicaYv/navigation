@@ -207,3 +207,17 @@ class OptimizedRouteRequest(BaseModel):
     locations: List[LocationPoint] = Field(..., min_length=4)
     costing: str = "auto"
     units: str = "kilometers"
+    
+class NearbyPOIRequest(BaseModel):
+    lat: float = Field(..., description="Latitude of the point")
+    lon: float = Field(..., description="Longitude of the point")
+    distance: int = Field(500, description="Search radius in meters", ge=1)
+    amenity: Optional[str] = Field(None, description="Amenity type to filter (optional)")
+    limit: int = Field(50, description="Limit the number of results", ge=1, le=500)
+    
+class PlaceDetailsRequest(BaseModel):
+    place_id: str = Field(..., description="Unique MongoDB ID of the place")
+    
+class NearbySearchAdvancedRequest(NearbyPOIRequest):
+    sort_by: Optional[str] = Field("distance", description="Sorting criteria: distance, name, brand")
+    keyword: Optional[str] = Field(None, description="Keyword search in name or description")
