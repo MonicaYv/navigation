@@ -1,18 +1,16 @@
-from fastapi import APIRouter, Header, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from passlib.context import CryptContext
 import asyncio
 from jose import jwt
 from datetime import datetime, timedelta
-import os
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 from app.models import User
-from app.schemas import UserLogin, OTPVerify, UserCreate, UserOut, UserRegisterWithOTP  # <-- add UserRegisterWithOTP if defined
+from app.schemas import UserLogin, OTPVerify, UserCreate, UserOut, UserRegisterWithOTP
 from app.otp_utils import generate_otp_secret, generate_otp, verify_otp
 from app.email_utils import send_email
 from app.database import SessionLocal
-from app.config import AUTHORIZATION_KEY, SECRET_KEY, ALGORITHM  # Import from your config module
+from app.config import AUTHORIZATION_KEY, SECRET_KEY, ALGORITHM
+from fastapi import APIRouter, Header, Depends, HTTPException
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 

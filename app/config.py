@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
 AUTHORIZATION_KEY = os.getenv("AUTHORIZATION_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 MONGO_URL = os.getenv("MONGO_URL")
@@ -13,3 +14,7 @@ SMTP_FROM = os.getenv("DEFAULT_FROM_EMAIL")
 SMTP_HOST = os.getenv("EMAIL_HOST")
 SMTP_PORT = int(os.getenv("EMAIL_PORT", 587))
 SMTP_TLS = os.getenv("MAIL_TLS") == "True"
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+MAX_DISTANCE_KM = 400
+VALHALLA_BASE_URL = os.getenv("VALHALLA_BASE_URL")
+TILESERVER_URL = os.getenv("TILESERVER_URL")

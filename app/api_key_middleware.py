@@ -1,12 +1,11 @@
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database import SessionLocal
 from app.models import CompanySubscription, APIUsage, Plan
 from datetime import datetime
 from sqlalchemy import func, and_
-
+from datetime import timedelta
 import time
 
 class APIKeyTrackingAndRateLimitMiddleware(BaseHTTPMiddleware):
@@ -54,7 +53,7 @@ class APIKeyTrackingAndRateLimitMiddleware(BaseHTTPMiddleware):
                 # You could track with Redis for true concurrency, or approximate with APIUsage "last few seconds".
                 # Here, let's assume at most N requests per second for demo:
                 if plan.concurrent_connections:
-                    since = datetime.utcnow() - timedelta(seconds=1)
+                    since = datetime.now() - timedelta(seconds=1)
                     count_q = await db.execute(
                         select(func.count()).where(
                             and_(

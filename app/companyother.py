@@ -1,8 +1,14 @@
-from fastapi import Depends, HTTPException, Header, Request
+from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from app.models import User, CompanySubscription, AllowedDomain, Company
+from app.config import SECRET_KEY
 from app.database import SessionLocal
-from app.models import CompanySubscription, AllowedDomain, Company
+
+from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, Header, Request, status
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login/token")
 
 async def get_db():
     async with SessionLocal() as session:
@@ -43,17 +49,6 @@ async def get_current_company_by_apikey(
     )
     company = c_q.scalar_one_or_none()
     return company
-from fastapi import Depends, HTTPException, Header, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from jose import JWTError, jwt
-from app.config import SECRET_KEY
-from app.database import SessionLocal
-from app.models import User, Company, CompanySubscription
-
-from fastapi.security import OAuth2PasswordBearer
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login/token")  # Your token endpoint
 
 async def get_db():
     async with SessionLocal() as session:

@@ -13,7 +13,6 @@ from app.auth import check_authorization_key
 from app.schemas import GeofenceCreate, GeofenceOut, LocationPoint
 from typing import List
 import logging
-import json
 logger = logging.getLogger(__name__)
 
 router = APIRouter()

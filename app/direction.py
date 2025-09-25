@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from app.auth import check_authorization_key
 from app.models import User, TurnLog, NavigationLogHistory
 from app.schemas import RouteRequest, RouteResponse, MatrixRequest, SnapRequest, LocationPoint, MatrixBasicRequest, NavigationLogHistoryCreate, OptimizedRouteRequest
-from app.config import SECRET_KEY, ALGORITHM
+from app.config import SECRET_KEY, ALGORITHM, VALHALLA_BASE_URL, MAX_DISTANCE_KM
 from app.database import SessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -14,9 +14,6 @@ from geopy.distance import geodesic
 from math import radians, sin, cos, sqrt, atan2
 import logging
 logger = logging.getLogger(__name__)
-
-MAX_DISTANCE_KM = 400
-VALHALLA_BASE_URL = "http://192.168.1.110:3095"
 
 router = APIRouter()
 

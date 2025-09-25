@@ -1,18 +1,16 @@
 import re
-from duckdb import cursor
 import httpx
+from datetime import datetime
 from bson import ObjectId
 from jose import jwt, JWTError
-from numpy import place
-from pymongo import MongoClient
-from motor.motor_asyncio import AsyncIOMotorClient
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 from app.models import User
 from app.auth import check_authorization_key
+from app.mongo import weather_db, mongo_db
 from app.schemas import NearbyPOIRequest, PlaceDetailsRequest, NearbySearchAdvancedRequest
-from app.config import SECRET_KEY, ALGORITHM
+from app.config import SECRET_KEY, ALGORITHM, WEATHER_API_KEY, TILESERVER_URL
 from app.database import SessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -24,19 +22,13 @@ router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-client = AsyncIOMotorClient("mongodb://192.168.1.110:28017")
-db = client["FinalPOIs"]
-pois = db["OSM"]
+pois = mongo_db["OSM"]
 
 async def get_db():
     async with SessionLocal() as session:
         yield session
         
-async def verify_auth(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
-    _auth=Depends(check_authorization_key)
-):
+async def verify_auth(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db), auth=Depends(check_authorization_key)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
@@ -68,7 +60,7 @@ async def get_map_tile(z: int, x: int, y: int, style: str = "day", no_poi: bool 
         base = "dark-mode-nopoi" if no_poi else "dark-mode"
     else:
         raise HTTPException(status_code=400, detail="Invalid style parameter. Use 'day' or 'night'.")
-    tile_url = f"http://192.168.1.110:4090/styles/{base}/256/{z}/{x}/{y}.png"
+    tile_url = f"{TILESERVER_URL}/styles/{base}/256/{z}/{x}/{y}.png"
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
             response = await client.get(tile_url)
@@ -81,7 +73,7 @@ async def get_map_tile(z: int, x: int, y: int, style: str = "day", no_poi: bool 
     
 @router.get("/api/vector-tiles/{z}/{x}/{y}.pbf")
 async def get_vector_tile(z: int, x: int, y: int, user: User = Depends(verify_auth)):
-    tile_url = f"http://192.168.1.110:4090/data/openmaptiles/{z}/{x}/{y}.pbf"
+    tile_url = f"{TILESERVER_URL}/data/openmaptiles/{z}/{x}/{y}.pbf"
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
             response = await client.get(tile_url)
@@ -210,3 +202,69 @@ async def get_nearby_poi_advanced(payload: NearbySearchAdvancedRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
+    
+@router.get("/api/weather")
+async def get_weather(lat: float = Query(...), lon: float = Query(...), user: User = Depends(verify_auth)):
+    try:
+        grid_lat = round(lat / 0.18) * 0.18
+        grid_lon = round(lon / 0.18) * 0.18
+
+        # Check cache
+        cache = await weather_db["cache"].find_one({
+            "grid_lat": grid_lat,
+            "grid_lon": grid_lon
+        })
+
+        now = datetime.now()
+
+        if cache and (now - cache["timestamp"]).total_seconds() < 3600:
+            logger.info(f"✅ Weather cache hit for {grid_lat},{grid_lon}")
+            cache["_id"] = str(cache["_id"])
+            return JSONResponse(content={
+                "status": True,
+                "source": "cache",
+                "result": cache["data"]
+            })
+
+        # If no cache or expired → fetch Visual Crossing API
+        url = (
+            f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/"
+            f"{lat},{lon}?unitGroup=metric&include=current&key={WEATHER_API_KEY}&contentType=json"
+        )
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            data = response.json()
+
+        # Save/update cache
+        await weather_db["cache"].update_one(
+            {"grid_lat": grid_lat, "grid_lon": grid_lon},
+            {
+                "$set": {
+                    "lat": lat,
+                    "lon": lon,
+                    "grid_lat": grid_lat,
+                    "grid_lon": grid_lon,
+                    "timestamp": now,
+                    "data": data
+                }
+            },
+            upsert=True
+        )
+
+        return JSONResponse(content={
+            "status": True,
+            "source": "api",
+            "result": data
+        })
+
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Weather API error: {e.response.status_code} {e.response.text}")
+        raise HTTPException(status_code=e.response.status_code, detail="Weather API error")
+    except httpx.RequestError as e:
+        logger.error(f"Weather API connection failed: {e}")
+        raise HTTPException(status_code=500, detail="Weather API connection failed")
+    except Exception as e:
+        logger.exception("Unexpected error in weather endpoint")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
