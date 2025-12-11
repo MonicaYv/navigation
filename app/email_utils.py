@@ -1,11 +1,6 @@
 import aiosmtplib
 from email.message import EmailMessage
-
-SMTP_HOST = "mail.sizaf.com"
-SMTP_PORT = 465
-SMTP_USERNAME = "dotsdesktop@sizaf.com"
-SMTP_PASSWORD = "eri$45;e]H0K"
-SMTP_FROM = "dotsdesktop@sizaf.com"
+from app.config import SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM
 
 async def send_email(recipient: str, subject: str, body: str):
     msg = EmailMessage()

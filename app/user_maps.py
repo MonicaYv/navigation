@@ -2,46 +2,17 @@ import re
 import httpx
 from datetime import datetime
 from bson import ObjectId
-from jose import jwt, JWTError
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse, JSONResponse
-from fastapi.security import OAuth2PasswordBearer
 from app.models import User
-from app.auth import check_authorization_key
-from app.mongo import weather_db, mongo_db
+from app.auth import verify_auth
+from app.database import weather_cache, pois
+from app.config import WEATHER_API_KEY, TILESERVER_URL, WEATHER_SERVICE_URL
 from app.schemas import NearbyPOIRequest, PlaceDetailsRequest, NearbySearchAdvancedRequest
-from app.config import SECRET_KEY, ALGORITHM, WEATHER_API_KEY, TILESERVER_URL
-from app.database import SessionLocal
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-
 import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-pois = mongo_db["OSM"]
-
-async def get_db():
-    async with SessionLocal() as session:
-        yield session
-        
-async def verify_auth(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db), auth=Depends(check_authorization_key)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    q = await db.execute(select(User).where(User.email == email))
-    user = q.scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
 
 @router.get("/api/user")
 async def user_details(user: User = Depends(verify_auth)):
@@ -64,7 +35,7 @@ async def get_map_tile(z: int, x: int, y: int, style: str = "day", no_poi: bool 
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
             response = await client.get(tile_url)
-            response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+            response.raise_for_status()
             return StreamingResponse(response.iter_bytes(), media_type=response.headers['Content-Type'])
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=f"Failed to fetch tile: {e.response.status_code} {e.response.text}")
@@ -92,20 +63,18 @@ async def get_vector_tile(z: int, x: int, y: int, user: User = Depends(verify_au
             status_code=500,
             detail=f"Could not connect to vector tile server: {e}"
         )
-        
-        
+    
 @router.post("/api/nearby-places")
 async def get_nearby_poi(payload: NearbyPOIRequest):
-    """Get nearby points of interest (POI) based on location and distance from user."""
     try:
         query = {
             "geometry": {
-                "$near": {
+                "$nearSphere": {
                     "$geometry": {
                         "type": "Point",
                         "coordinates": [payload.lon, payload.lat]
                     },
-                    "$maxDistance": payload.distance
+                    "$maxDistance": int(payload.distance)
                 }
             }
         }
@@ -115,23 +84,24 @@ async def get_nearby_poi(payload: NearbyPOIRequest):
                 "$regex": rf"(^|;){re.escape(payload.amenity)}(;|$)",
                 "$options": "i"
             }
-
-        cursor = pois.find(query).limit(payload.limit)
+            
+        cursor = pois.find(query).limit(int(payload.limit))
+        
         results = []
         async for doc in cursor:
             doc["_id"] = str(doc["_id"])
             results.append(doc)
-
+            
         return JSONResponse(content={
             "status": True,
             "count": len(results),
-            "results": results
+            "results": results,
         })
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
-
-@router.post("/places/details")
+        raise HTTPException(status_code=500, detail=f"Database query failed")
+    
+@router.post("/places/details")    
 async def place_details(payload: PlaceDetailsRequest):
     """Retrieve detailed metadata for a place by ID."""
     try:
@@ -172,7 +142,6 @@ async def get_nearby_poi_advanced(payload: NearbySearchAdvancedRequest):
                 "$options": "i"
             }
 
-        # Keyword in name or description
         if payload.keyword:
             query["$or"] = [
                 {"properties.name": {"$regex": payload.keyword, "$options": "i"}},
@@ -182,12 +151,10 @@ async def get_nearby_poi_advanced(payload: NearbySearchAdvancedRequest):
 
         cursor = pois.find(query).limit(payload.limit)
 
-        # Sorting logic
         if payload.sort_by == "name":
             cursor = cursor.sort("properties.name", 1)
         elif payload.sort_by == "brand":
             cursor = cursor.sort("properties.brand", 1)
-        # Default: distance is auto-sorted by $near
 
         results = []
         async for doc in cursor:
@@ -209,8 +176,7 @@ async def get_weather(lat: float = Query(...), lon: float = Query(...), user: Us
         grid_lat = round(lat / 0.18) * 0.18
         grid_lon = round(lon / 0.18) * 0.18
 
-        # Check cache
-        cache = await weather_db["cache"].find_one({
+        cache = await weather_cache.find_one({
             "grid_lat": grid_lat,
             "grid_lon": grid_lon
         })
@@ -225,11 +191,8 @@ async def get_weather(lat: float = Query(...), lon: float = Query(...), user: Us
                 "source": "cache",
                 "result": cache["data"]
             })
-
-        # If no cache or expired → fetch Visual Crossing API
         url = (
-            f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/"
-            f"{lat},{lon}?unitGroup=metric&include=current&key={WEATHER_API_KEY}&contentType=json"
+            f"{WEATHER_SERVICE_URL}/{lat},{lon}?unitGroup=metric&include=current&key={WEATHER_API_KEY}&contentType=json"
         )
 
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -237,8 +200,7 @@ async def get_weather(lat: float = Query(...), lon: float = Query(...), user: Us
             response.raise_for_status()
             data = response.json()
 
-        # Save/update cache
-        await weather_db["cache"].update_one(
+        await weather_cache.update_one(
             {"grid_lat": grid_lat, "grid_lon": grid_lon},
             {
                 "$set": {

@@ -1,24 +1,20 @@
 import asyncio
-from jose import jwt
+from jose import jwt, JWTError
 from datetime import datetime, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-
 from app.models import User
 from app.schemas import UserLogin, OTPVerify, UserCreate, UserOut, UserRegisterWithOTP
 from app.otp_utils import generate_otp_secret, generate_otp, verify_otp
 from app.email_utils import send_email
-from app.database import SessionLocal
-from app.config import AUTHORIZATION_KEY, SECRET_KEY, ALGORITHM
+from app.database import get_db
+from app.config import AUTHORIZATION_KEY, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from fastapi import APIRouter, Header, Depends, HTTPException
-
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 router = APIRouter()
 
-async def get_db():
-    async with SessionLocal() as session:
-        yield session
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -30,6 +26,21 @@ def check_authorization_key(authorization_key: str = Header(...)):
     if authorization_key != AUTHORIZATION_KEY:
         raise HTTPException(status_code=401, detail="Invalid authorization key")
     return authorization_key
+
+async def verify_auth(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db), auth=Depends(check_authorization_key)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    q = await db.execute(select(User).where(User.email == email))
+    user = q.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
 
 @router.post("/api/send-otp")
 async def send_otp(user: UserCreate, _auth=Depends(check_authorization_key)):
@@ -59,7 +70,7 @@ async def register(
     new_user = User(
         name=data.name,
         email=data.email,
-        otp_secret=data.otp_token,  # save for future login if needed
+        otp_secret=data.otp_token,
         is_active=True
     )
     db.add(new_user)
@@ -79,6 +90,7 @@ async def login_request_otp(
         return {'status': False, "msg": "User not found"}
     otp = generate_otp(user.otp_secret)
     asyncio.create_task(send_email(user.email, "Your OTP Code", f"Your OTP is: {otp}"))
+    print(f"Sent OTP: {otp}")
     return {"status": True, "msg": "OTP sent to email"}
 
 @router.post("/api/login/verify")

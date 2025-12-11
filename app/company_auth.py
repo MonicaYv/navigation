@@ -1,26 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from passlib.context import CryptContext
 from jose import jwt, JWTError
-from app.config import SECRET_KEY, ALGORITHM
-from app.models import CompanySubscription, Company
+from app.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.models import User, CompanySubscription, Company
 from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer
+from app.database import get_db
 
-from app.models import User
-from app.database import SessionLocal
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login/token")
 
 router = APIRouter()
-
-async def get_db():
-    async with SessionLocal() as session:
-        yield session
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -33,7 +24,6 @@ async def get_current_company_user_and_subscription(
     x_api_key: str = Header(..., alias="X-API-Key"),
     db: AsyncSession = Depends(get_db)
 ):
-    # 1. Validate JWT
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid JWT or credentials",
@@ -51,7 +41,6 @@ async def get_current_company_user_and_subscription(
     if not user:
         raise credentials_exception
 
-    # 2. Validate API Key
     sub_q = await db.execute(
         select(CompanySubscription).where(
             CompanySubscription.api_key == x_api_key,

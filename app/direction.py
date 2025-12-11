@@ -1,46 +1,20 @@
 import httpx
-from datetime import datetime 
-from jose import jwt, JWTError
-from fastapi import APIRouter,Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
-from app.auth import check_authorization_key
-from app.models import User, TurnLog, NavigationLogHistory
+from datetime import datetime
+from fastapi import APIRouter,Depends
+from app.auth import verify_auth
+from app.models import User, TurnLog, NavigationLogHistory, NavigationLog
 from app.schemas import RouteRequest, RouteResponse, MatrixRequest, SnapRequest, LocationPoint, MatrixBasicRequest, NavigationLogHistoryCreate, OptimizedRouteRequest
-from app.config import SECRET_KEY, ALGORITHM, VALHALLA_BASE_URL, MAX_DISTANCE_KM
-from app.database import SessionLocal
+from app.config import  VALHALLA_BASE_URL, MAX_DISTANCE_KM
+from app.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 from geopy.distance import geodesic
 from math import radians, sin, cos, sqrt, atan2
+
 import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-async def get_db():
-    async with SessionLocal() as session:
-        yield session
-
-async def verify_auth(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
-    _auth=Depends(check_authorization_key)
-):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    q = await db.execute(select(User).where(User.email == email))
-    user = q.scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
 
 async def call_valhalla(endpoint: str, payload: dict, timeout: float = 30.0):
     try:
@@ -60,7 +34,7 @@ async def call_valhalla(endpoint: str, payload: dict, timeout: float = 30.0):
         return False, {"error": str(e)}
     
 def haversine(lat1, lon1, lat2, lon2):
-    R = 6371  # Earth's radius in km
+    R = 6371
     dlat = radians(lat2 - lat1)
     dlon = radians(lon2 - lon1)
     a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
@@ -312,3 +286,31 @@ async def get_optimized_route(request: OptimizedRouteRequest, user: User = Depen
         msg="Failed to get optimized route",
         error=data.get("error", "Unknown error occurred")
     )
+    
+async def save_navigation_log(
+    db: AsyncSession,
+    user_id: int,
+    start_place: str,
+    destination: str,
+    start_time: datetime,
+    end_time: datetime,
+    status: bool,
+    message: str,
+    error: str = None,
+    directions: list = [],
+):
+    duration = end_time - start_time
+    log = NavigationLog(
+        user_id=user_id,
+        start_place=start_place,
+        destination=destination,
+        start_time=start_time,
+        end_time=end_time,
+        time_taken=duration,
+        directions=directions,
+        status=status,
+        message=message,
+        error=error
+    )
+    db.add(log)
+    await db.commit()

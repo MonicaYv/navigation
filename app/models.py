@@ -1,15 +1,15 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Numeric, Text, TIMESTAMP, Interval, Enum, Float, DateTime, JSON
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+import enum
+from .database import Base
+from sqlalchemy.sql import func
 from geoalchemy2 import Geometry
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from .database import Base
-import enum
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Numeric, Text, TIMESTAMP, Interval, Enum, Float
 
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
-    name = Column(String(100), nullable=False)         # <--- Add this line
+    name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     otp_secret = Column(String(32), nullable=True)
     is_active = Column(Boolean, default=True)
@@ -111,7 +111,7 @@ class NavigationLog(Base):
     start_time = Column(TIMESTAMP)
     end_time = Column(TIMESTAMP)
     time_taken = Column(Interval)
-    directions = Column(JSONB)  # PostgreSQL JSONB to store maneuvers
+    directions = Column(JSONB)
     status = Column(Boolean, default=False)
     message = Column(String(255))
     error = Column(String(255), nullable=True)

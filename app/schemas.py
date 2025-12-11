@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Dict
+from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 
@@ -135,8 +135,7 @@ class LocationPoint(BaseModel):
     
 class RouteRequest(BaseModel):
     locations: List[LocationPoint]
-    mode: str = "auto"  # Default to "auto"
-    # Add other optional parameters as needed
+    mode: str = "auto"
     units: Optional[str] = "kilometers"
     language: Optional[str] = "en-US"
     

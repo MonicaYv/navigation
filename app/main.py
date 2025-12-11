@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-
 from .auth import router as auth_router
 #from .company_auth import router as company_auth_router
 from .user_maps import router as user_maps_router
